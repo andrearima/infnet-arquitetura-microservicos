@@ -1,0 +1,32 @@
+@startuml
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/c4-PlantUML/master/C4_Container.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+AddRelTag("async", $lineStyle = DashedLine())
+
+Container(apiGateway, "ApiGateway","aws")
+Container(bffWeb, "BFF Web","consultas para web"){
+    Rel(apiGateway, bffWeb, "repassa")
+}
+Container(bffWebAdm, "BFF Web Adm","consome de acordo com necessidade web","cadastros, promoções, categorias"){
+    Rel(apiGateway, bffWebAdm, "repassa")
+}
+Container(bffApp, "BFF App","apenas consultas para app mobile"){
+    Rel(apiGateway, bffApp, "repassa")
+}
+
+Container(pubsub, "PubSub Estoque","Google PubSub")
+System_Boundary(catalogoContext, "Catalogo Context"){
+    Container(catalogo, "Catalogo de Produtos", "WebApi / GraphQL","Consultas e sistema de pesquisa seguindo padrões GraphQL"){
+        Rel(catalogo, pubsub, "escuta topico sobre alterações de estoque e atualiza se necessário", $tags="async")
+    }
+    ContainerDb(catalogooDb, "Catalogo", "Cassandra NoSQL"){
+        Rel(catalogo, catalogooDb, "CRUD")
+    }
+
+    Rel(bffWeb, catalogo, "Consome")
+    Rel(bffApp, catalogo, "Consome")
+    Rel(bffWebAdm, catalogo, "Consome")
+}
+
+@enduml

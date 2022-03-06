@@ -1,0 +1,56 @@
+@startuml
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/c4-PlantUML/master/C4_Container.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+AddRelTag("async", $lineStyle = DashedLine())
+
+Container(apiGateway, "Api Gateway","Amazon Api Gateway")
+Container(bffApp, "BFF Mobile", "WebApi"){
+    Rel(apiGateway, bffApp, "Direciona")
+}
+Container(bffWeb, "BFF Web", "WebApi"){
+    Rel(apiGateway, bffWeb, "Direciona")
+}
+System_Boundary(estoque, "EstoqueContext"){
+    ContainerQueue(pubSubEstoque, "Estoque","Controle Estoque")
+}
+System_Boundary(pagamento, "PagamentoContext"){
+    ContainerQueue(pubSubPagamento, "Pagamento","Controle Pagamento")
+}
+System_Ext(sistemaLogistica,"Logistica","Sistema externo de logística para entrega de mercadorias")
+System_Boundary(carrinhoContext, "Carrinho de Compra Context"){
+
+    Container(carrinho, "Carrinho de Compras", "WebApi"){
+        Rel(bffApp, carrinho, "Manipula itens do carrinho")
+        Rel(bffApp, carrinho, "solicita check out","")
+
+        Rel(bffWeb, carrinho, "Manipula itens do carrinho")
+        Rel(bffWeb, carrinho, "solicita check out","")
+    }
+    ContainerDb(carrinhoDb, "Carrinho Db", "Aurora PostgreSQL"){
+        Rel(carrinho, carrinhoDb, "usa")
+    }
+
+    ContainerQueue(pubSubCheckOut, "PubSub CheckOut", "Google PubSub"){
+        Rel(carrinho, pubSubCheckOut, "solicita check out", "Topico CheckOut", $tags="async")
+        Rel(carrinho, pubSubCheckOut, "Verifica status","Topico Status", $tags="async")
+    }
+
+    Container(checkOut, "Check Out", "Saga Worker", "Orquestrador do CheckOut"){
+        Rel(checkOut, pubSubCheckOut, "Verifica processo de checkout","Topico CheckOut",  $tags="async")
+        Rel(checkOut, pubSubCheckOut, "Publica etapas do processo","Topico Status", $tags="async")
+
+        Rel(checkOut, estoque, "Solicita Reserva do Estoque", "Step1", $tags="async")
+        Rel(checkOut, pubSubPagamento, "Solicita Pagamento", "Step2", $tags="async")
+
+        Rel(checkOut, estoque, "Solicita Baixa do Estoque", "Step3", $tags="async")
+        Rel(checkOut, sistemaLogistica, "Solicita Envio das mercadorias", "Step4", $tags="async")
+    }
+    ContainerDb(checkOutDb, "CheckOut Db", "Aurora PostgreSQL"){
+        Rel(checkOut, checkOutDb, "usa")
+    }
+
+
+}
+
+@enduml

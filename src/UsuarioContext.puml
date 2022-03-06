@@ -1,0 +1,20 @@
+@startuml
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/c4-PlantUML/master/C4_Container.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+AddRelTag("async", $lineStyle = DashedLine())
+
+System_Ext(authentication,"Auth0","Sistema externo de autenticação")
+Container(apiGateway, "ApiGateway","aws")
+System_Boundary(usuarioContext, "Usuário Context"){
+    Container(usuario, "Cadastro de Usuários", "WebApi"){
+        Rel(usuario, authentication, "verifica informações e configura permissões se é cliente ou administrador e se quem está requisitando pode fazer a operação")
+    }
+    ContainerDb(usuarioDb, "Usuários", "Aurora PostgreSQL"){
+        Rel(usuario, usuarioDb, "CRUD")
+    }
+
+    Rel(apiGateway, usuario, "Consome")
+}
+
+@enduml

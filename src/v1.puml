@@ -1,0 +1,131 @@
+@startuml
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/c4-PlantUML/master/C4_Container.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+' Neste projeto de disciplina,
+  'projete um desenho arquitetural de microsserviços para um e-commerce,
+  'identificando os contextos delimitados (bounded contexts)
+  'utilizando modelo C4, e explicando como os microsserviços conversarão entre si.
+  'Desenhe a arquitetura levando em consideração o teorema CAP,
+  'e o Twelve-Factor para a arquitetura.
+  '
+  'Seu projeto deve considerar, pelo menos, as seguintes funcionalidades:
+  '
+  'Carrinho de compras, com adição e exclusão de produtos;
+  'Busca de produtos;
+  'Pagamento;
+  'Cadastro de usuários.
+AddRelTag("async", $lineStyle = DashedLine())
+SHOW_PERSON_PORTRAIT()
+Person(cliente_final, "Cliente", "Cliente que faz compras no ecommerce")
+Person(administrador, "Administrador", "Pessoa que administra o ecommerce")
+
+System_Boundary(pagamentos, "Gateways de Pagamento"){
+    System_Ext(sistemaPagamento1,"PagSeguro","Sistema externo de pagamento")
+    System_Ext(sistemaPagamento2,"MercadoPago","Sistema externo de pagamento")
+    System_Ext(sistemaPagamento3,"PayPal","Sistema externo de pagamento")
+}
+System_Ext(sistemaLogistica,"Logistica","Sistema externo de logística para entrega de mercadorias")
+System_Ext(authentication,"Auth0","Sistema externo de autenticação")
+
+Enterprise_Boundary(ecommerce, "Ecommerce"){
+    System_Boundary(externo, "Rede interna aberta para a externa"){
+        System_Boundary(frontEnd, "Front Cliente"){
+            Container(appMobile, "App Mobile", "Flutter", "App ecommerce Android / IOS"){
+                Rel(appMobile, authentication, "autentica", "HTTPS")
+                Rel(cliente_final, appMobile, "usa ecommerce","Mobile")
+            }
+            Container(webFrontEnd, "WebSite", "SPA Blazor", "Site ecommerce"){
+                Rel(webFrontEnd, authentication, "autentica", "HTTPS")
+                Rel(cliente_final, webFrontEnd, "usa ecommerce","Navegador")
+            }
+        }
+
+        System_Boundary(frontEndAdm, "Front Adm"){
+            Container(administracaoFrontEnd, "WebSite", "SPA Blazor", "Site para administrar o ecommerce"){
+                Rel(administrador, administracaoFrontEnd, "administra ecommerce", "Navegador")
+                Rel(administracaoFrontEnd, authentication, "autentica", "HTTPS")
+            }
+        }
+
+        Container(apiGatway,"Api Gateway","Amazon Api Gateway", "faz direcionamentos necessários"){
+            Rel(appMobile, apiGatway, "faz requisições","HTTPS/JSON")
+            Rel(webFrontEnd, apiGatway, "faz requisições","HTTPS/JSON")
+            Rel(administracaoFrontEnd, apiGatway, "faz requisições","HTTPS/JSON")
+            Rel(apiGatway, authentication, "verifica autenticação", "AWS Lambda")
+        }
+    }
+
+
+    System_Boundary(interno, "Rede Interna"){
+
+        System_Boundary(pagamentoContext, "Pagamento Context"){
+            Container(pagamento, "Integração de Pagamentos", "Worker"){
+                Rel(pagamento,pagamentos, "Efetiva pagamento através de","Melhor comunicação disponível")
+            }
+            ContainerDb(pagamentoDb, "Pagamento","Aurora PostgreSQL"){
+                Rel(pagamento, pagamentoDb, "usa")
+            }
+        }
+
+
+
+        System_Boundary(usuarioContext, "Usuario Context"){
+            Container(cadastroUsuario, "Cadastro de Usuários", "WebApi", "Responsavel por manter os usuarios"){
+                Rel(apiGatway,cadastroUsuario, "se cadastra", "cliente")
+                Rel(apiGatway,cadastroUsuario, "cadastra através de um administrador", "administrador")
+                Rel(cadastroUsuario, authentication,"verifica e modifica")
+            }
+            ContainerDb(cadastroUsuarioDB, "Usuario", "Aurora PostgreSQL", "consistencia, replicas de leitura, disponibilidade"){
+                Rel(cadastroUsuario,cadastroUsuarioDB, "usa")
+            }
+        }
+
+        System_Boundary(catalogoContext, "Catalogo Context"){
+            Container(catalogoProdutos,"Catalogo de Produtos","Web Api/GraphQL","Responsavel por manter os produtos e disponibilizar dados"){
+                Rel(apiGatway, catalogoProdutos,"consulta", "cliente/administrador")
+                Rel(apiGatway, catalogoProdutos,"Realiza manutenção", "administrador")
+            }
+            ContainerDb(catalogoProdutoDb, "Catalogo Produtos", "NoSql Cassandra", "Alta disponibilidade"){
+                Rel(catalogoProdutos,catalogoProdutoDb, "usa")
+            }
+        }
+
+
+        System_Boundary(estoqueContext, "estoqueContext"){
+            Container(estoque, "Estoque", "gRPC / Worker", "responsavel por manter o estoque dos produtos"){
+                Rel(estoque, catalogoProdutos, "publica alterações de estoque através","Estoque pubSub", $tags = "async")
+                Rel(apiGatway,estoque, "Mantem", "Administrador")
+            }
+
+            ContainerDb(estoqueDb, "Estoque", "Aurora PostgreSQL", "consistência de dados"){
+                Rel(estoque,estoqueDb, "usa")
+            }
+        }
+
+        System_Boundary(carrinhoCompraContext, "Carrinho Compra Context"){
+            Container(carrinhoCompra,"Carrinho de Compras","Web Api", "Possibilita a efetiva de compra, adicionando, removento itens"){
+                Rel(apiGatway, carrinhoCompra,"faz pedido", "cliente")
+                Rel(apiGatway, carrinhoCompra,"Realiza manutenção","admin consulta")
+                Rel(carrinhoCompra, sagaCheckOut,"Realiza checkout","pubsub", $tags = "async")
+            }
+
+            ContainerDb(carrinhoCompraDb, "Carrinho", "Aurora PostgreSQL", "consistência de dados"){
+                Rel(carrinhoCompra,carrinhoCompraDb, "usa")
+            }
+
+            Container(sagaCheckOut,"CheckOut","Saga/Worker","responsavel por orquestrar todo fluxo de checkout"){
+                Rel(sagaCheckOut, estoque, "realiza baixa / reserva / reposicao do estoque","pubsub", $tags = "async")
+                Rel(sagaCheckOut, pagamento, "efetiva / estorna pagamento","pubsub", $tags = "async")
+                Rel(sagaCheckOut, sistemaLogistica, "Envia Pedido para cliente")
+                Rel(sagaCheckOut, carrinhoCompra, "Notifica sucessos e falhas", "PubSub", $tags="async")
+            }
+            ContainerDb(estoquesagaCheckOut, "SagaCheckOut", "Aurora PostgreSQL", "consistência de dados"){
+                Rel(sagaCheckOut, estoquesagaCheckOut, "usa")
+            }
+        }
+    }
+}
+
+@enduml

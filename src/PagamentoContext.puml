@@ -1,0 +1,26 @@
+@startuml
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/c4-PlantUML/master/C4_Container.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+AddRelTag("async", $lineStyle = DashedLine())
+
+System_Boundary(pagamentos, "Gateways de Pagamento"){
+    System_Ext(sistemaPagamento1,"PagSeguro","Sistema externo de pagamento")
+    System_Ext(sistemaPagamento2,"MercadoPago","Sistema externo de pagamento")
+    System_Ext(sistemaPagamento3,"PayPal","Sistema externo de pagamento")
+}
+System_Boundary(checkOutContext, "CheckOut Context"){
+}
+System_Boundary(pagamentoContext, "Pagamento Context"){
+    Rel(checkOutContext, pagamento, "solicita através de","PubSub", $tags = "async")
+    Rel(pagamento, checkOutContext, "Notifica sucesso ou falha através de","PubSub", $tags = "async")
+    Container(pagamento, "Integração de Pagamentos", "Worker", "Normaliza dados para realizar operações com Gateway de pagamento escolhido, atendendo como AntiCorruption Layer"){
+        Rel(pagamento,pagamentos, "Efetiva pagamento através de","Melhor comunicação disponível")
+    }
+
+    ContainerDb(pagamentoDb, "PagamentoDb","Aurora PostgreSQL"){
+        Rel(pagamento, pagamentoDb, "usa")
+        }
+    }
+
+@enduml

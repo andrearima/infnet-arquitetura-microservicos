@@ -1,0 +1,30 @@
+@startuml
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/c4-PlantUML/master/C4_Container.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+AddRelTag("async", $lineStyle = DashedLine())
+
+
+
+System_Boundary(checkOutContext, "CheckOut Context")
+System_Boundary(catalogoContext, "Catalogo Context")
+Container(bffWebAdm, "BFF Web Adm","mantem informações")
+System_Boundary(estoqueContext, "Estoque Context"){
+    Container(pubsub, "PubSub Estoque","Google PubSub")
+    Rel(bffWebAdm, estoque,"Movimentações de estoque, quebra")
+    Container(estoque, "Estoque", "gRPC / Worker"){
+        Rel(estoque, pubsub, "Publica movimentações de estoque","topico")
+    }
+
+    ContainerDb(estoqueDb, "Estoque DB","Aurora PostgreSQL", "banco de dados escalável com foco em integridade nos dados, com replicas de leitura"){
+        Rel(estoque, estoqueDb, "utiliza")
+    }
+
+    Rel(checkOutContext, pubsub,"Requisita reserva de estoque")
+    Rel(checkOutContext, pubsub,"Requisita baixa de estoque")
+    Rel(checkOutContext, pubsub,"Verifica confirmação")
+    Rel(estoque, pubsub,"Notifica sucesso ou falha para CheckOut")
+    Rel(catalogoContext, pubsub,"Consome as modificações")
+}
+
+@enduml
