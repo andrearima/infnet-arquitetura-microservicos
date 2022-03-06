@@ -13,18 +13,18 @@ System_Boundary(estoqueContext, "Estoque Context"){
     Container(pubsub, "PubSub Estoque","Google PubSub")
     Rel(bffWebAdm, estoque,"Movimentações de estoque, quebra")
     Container(estoque, "Estoque", "gRPC / Worker"){
-        Rel(estoque, pubsub, "Publica movimentações de estoque","topico")
+        Rel(estoque, pubsub, "Publica movimentações de estoque","topico", $tags="async")
     }
 
     ContainerDb(estoqueDb, "Estoque DB","Aurora PostgreSQL", "banco de dados escalável com foco em integridade nos dados, com replicas de leitura"){
         Rel(estoque, estoqueDb, "utiliza")
     }
 
-    Rel(checkOutContext, pubsub,"Requisita reserva de estoque")
-    Rel(checkOutContext, pubsub,"Requisita baixa de estoque")
-    Rel(checkOutContext, pubsub,"Verifica confirmação")
-    Rel(estoque, pubsub,"Notifica sucesso ou falha para CheckOut")
-    Rel(catalogoContext, pubsub,"Consome as modificações")
+    Rel(checkOutContext, pubsub,"Requisita reserva de estoque", $tags="async")
+    Rel(checkOutContext, pubsub,"Requisita baixa de estoque", $tags="async")
+    Rel(checkOutContext, pubsub,"Verifica confirmação", $tags="async")
+    Rel(estoque, pubsub,"Notifica sucesso ou falha para CheckOut", $tags="async")
+    Rel(catalogoContext, pubsub,"Consome as modificações", $tags="async")
 }
 
 @enduml
