@@ -6,6 +6,17 @@ AddRelTag("async", $lineStyle = DashedLine())
 
 System_Ext(authentication,"Auth0","Sistema externo de autenticação")
 Container(apiGateway, "ApiGateway","aws")
+Container(bffWeb, "BFF Web","cadastro"){
+    Rel(apiGateway, bffWeb, "repassa")
+}
+Container(bffWebAdm, "BFF Web Adm","cadastro admin"){
+    Rel(apiGateway, bffWebAdm, "repassa")
+}
+Container(bffApp, "BFF App","cadastro"){
+    Rel(apiGateway, bffApp, "repassa")
+}
+
+Container(apiGateway, "ApiGateway","aws")
 System_Boundary(usuarioContext, "Usuário Context"){
     Container(usuario, "Cadastro de Usuários", "WebApi"){
         Rel(usuario, authentication, "verifica informações e configura permissões se é cliente ou administrador e se quem está requisitando pode fazer a operação")
@@ -14,7 +25,9 @@ System_Boundary(usuarioContext, "Usuário Context"){
         Rel(usuario, usuarioDb, "CRUD")
     }
 
-    Rel(apiGateway, usuario, "Consome")
+    Rel(bffWebAdm, usuario, "Consome")
+    Rel(bffWeb, usuario, "Consome")
+    Rel(bffApp, usuario, "Consome")
 }
 
 @enduml
