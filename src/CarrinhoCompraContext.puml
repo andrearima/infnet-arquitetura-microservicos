@@ -26,6 +26,7 @@ System_Boundary(carrinhoContext, "Carrinho de Compra Context"){
 
         Rel(bffWeb, carrinho, "Manipula itens do carrinho")
         Rel(bffWeb, carrinho, "solicita check out","")
+        Rel(carrinho, sistemaLogistica, "Solicita Calculo de Frete")
     }
     ContainerDb(carrinhoDb, "Carrinho Db", "Aurora PostgreSQL"){
         Rel(carrinho, carrinhoDb, "usa")
